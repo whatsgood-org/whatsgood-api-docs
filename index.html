@@ -3,13 +3,41 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Whats Good — Customer API</title>
-    <meta name="description" content="REST API reference for Whats Good city/customer integrations." />
+    <title>Whats Good — Customer API Docs</title>
+    <meta name="description" content="Customer-facing REST API guide for Whats Good city integrations." />
     <link rel="icon" href="data:," />
+    <style>
+      :root { --bg:#0f172a; --accent:#2563eb; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1e293b; }
+      header.topbar {
+        position: sticky; top: 0; z-index: 50; background: var(--bg); color: #fff;
+        display: flex; align-items: center; gap: 22px; flex-wrap: wrap; padding: 12px 24px;
+      }
+      header.topbar .brand { font-weight: 700; letter-spacing: .2px; }
+      header.topbar nav a { color: #93c5fd; text-decoration: none; font-size: 14px; }
+      header.topbar nav a:hover { color: #fff; }
+      header.topbar .spacer { flex: 1 1 auto; }
+      header.topbar code { background: #1e293b; color: #e2e8f0; padding: 3px 10px; border-radius: 6px; font-size: 13px; }
+      main { max-width: 880px; margin: 0 auto; padding: 8px 24px 80px; }
+      zero-md { display: block; }
+    </style>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/zero-md@3?register"></script>
   </head>
   <body>
-    <!-- Scalar renders the customer-scoped OpenAPI spec below -->
-    <script id="api-reference" data-url="./openapi.json"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+    <header class="topbar">
+      <span class="brand">Whats Good API</span>
+      <nav>
+        <a href="./index.html">Guide</a>
+        &nbsp;·&nbsp;
+        <a href="./reference.html">Interactive API Reference</a>
+      </nav>
+      <span class="spacer"></span>
+      <code>https://whatsgoodapi.up.railway.app</code>
+    </header>
+    <main>
+      <!-- Renders the human-readable guide (GitHub-flavored markdown) -->
+      <zero-md src="./API_GUIDE.md"></zero-md>
+    </main>
   </body>
 </html>
