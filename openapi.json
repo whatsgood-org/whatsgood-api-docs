@@ -1721,7 +1721,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/api__routers__categories__CategoryResponse"
+                    "$ref": "#/components/schemas/CategoryResponse"
                   },
                   "title": "Response List Categories Categories Get"
                 }
@@ -1780,7 +1780,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/api__routers__audiences__AudienceResponse"
+                    "$ref": "#/components/schemas/AudienceResponse"
                   },
                   "title": "Response List Audiences Audiences Get"
                 }
@@ -4052,7 +4052,7 @@
         ],
         "title": "ValidationError"
       },
-      "api__routers__audiences__AudienceResponse": {
+      "AudienceResponse": {
         "properties": {
           "id": {
             "type": "integer",
@@ -4070,7 +4070,7 @@
         ],
         "title": "AudienceResponse"
       },
-      "api__routers__categories__CategoryResponse": {
+      "CategoryResponse": {
         "properties": {
           "id": {
             "type": "integer",
