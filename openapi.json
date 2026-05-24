@@ -1,0 +1,6867 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Whats Good Customer API",
+    "description": "REST API for a city/customer to manage their own event pipeline: register **sources** to scrape, review incoming **events**, approve the good ones, and read back the approved feed.\n\n## Authentication\nSend your key in the **`X-API-Key`** header (or `?api_key=` query param). Your key is scoped to one customer \u2014 you only ever see/modify your own data (another tenant's record returns 404; passing another `customer_id` returns 403).\n\n## Workflow\n1. `GET /me` \u2014 confirm which city the key is wired to\n2. `POST /sources` \u2014 register a source (auto-runs a scrape)\n3. `GET /events?status=new` \u2014 review what was scraped\n4. `POST /events/approve` \u2014 approve a batch (or `/events/{id}/approve`)\n5. `GET /events?status=approved&upcoming=true` \u2014 the live feed\n\nEvents flow `new \u2192 approved | rejected`. Approval is in place \u2014 the event stays in this database and flips to `approved`.\n",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/sources": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "List Sources",
+        "description": "List all sources with optional filters (tenant-scoped for customer keys).",
+        "operationId": "list_sources_sources_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by source type",
+              "title": "Type"
+            },
+            "description": "Filter by source type"
+          },
+          {
+            "name": "enabled",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by enabled status",
+              "title": "Enabled"
+            },
+            "description": "Filter by enabled status"
+          },
+          {
+            "name": "customer_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by customer ID",
+              "title": "Customer Id"
+            },
+            "description": "Filter by customer ID"
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SourceResponse"
+                  },
+                  "title": "Response List Sources Sources Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Create Source",
+        "description": "Create a new source and automatically run it.\n\nCustomer keys always create under their own customer; admins must supply a\n``customer_id`` (the column is NOT NULL).",
+        "operationId": "create_source_sources_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sources/{source_id}": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Get Source",
+        "description": "Get a single source by ID (tenant-scoped).",
+        "operationId": "get_source_sources__source_id__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Update Source",
+        "description": "Update a source (tenant-scoped).",
+        "operationId": "update_source_sources__source_id__put",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Delete Source",
+        "description": "Delete a source. By default keeps events (sets source_id = NULL). Pass clear_events=true to delete associated events.",
+        "operationId": "delete_source_sources__source_id__delete",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "clear_events",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Delete associated events instead of nulling source_id",
+              "default": false,
+              "title": "Clear Events"
+            },
+            "description": "Delete associated events instead of nulling source_id"
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sources/{source_id}/run": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Run Source",
+        "description": "Run the scraper for a specific source (background task). Tenant-scoped.",
+        "operationId": "run_source_sources__source_id__run_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "enhance",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Run enhancement after scraping",
+              "default": true,
+              "title": "Enhance"
+            },
+            "description": "Run enhancement after scraping"
+          },
+          {
+            "name": "max_events",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum events to scrape",
+              "title": "Max Events"
+            },
+            "description": "Maximum events to scrape"
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceRunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sources/{source_id}/logs": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "List Source Logs",
+        "description": "Get the log history for a specific source (tenant-scoped).",
+        "operationId": "list_source_logs_sources__source_id__logs_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum number of logs to return",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Maximum number of logs to return"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of logs to skip",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Number of logs to skip"
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScraperLogListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sources/{source_id}/logs/{log_id}": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Get Source Log",
+        "description": "Get a single log entry for a source (tenant-scoped).",
+        "operationId": "get_source_log_sources__source_id__logs__log_id__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "log_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Log Id"
+            }
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScraperLogResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/duplicate-scan": {
+      "post": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Scan Customer Duplicates",
+        "description": "Run a 1-off duplicate scan for a specific customer and return full results.\n\nRuns two checks against all non-duplicate events for the customer:\n\n1. **Internal**: compares every event against every other event in the local\n   database to find pairs that are likely the same event.\n2. **Production**: compares every event against the customer's production\n   database (via the external API) to find events that may already be live.\n\nIf `apply=true`, internal duplicates are written to the database:\n`duplicate_of_id` is set and `enhancement_status` is set to `'duplicate'`.\nProduction matches are reported only (they reference an external ID).",
+        "operationId": "scan_customer_duplicates_events_duplicate_scan_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "customer_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Customer UUID to scan for duplicates",
+              "title": "Customer Id"
+            },
+            "description": "Customer UUID to scan for duplicates"
+          },
+          {
+            "name": "threshold",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "description": "Similarity score threshold (0\u20131)",
+              "default": 0.85,
+              "title": "Threshold"
+            },
+            "description": "Similarity score threshold (0\u20131)"
+          },
+          {
+            "name": "date_proximity_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Hours within which dates are considered close",
+              "default": 24,
+              "title": "Date Proximity Hours"
+            },
+            "description": "Hours within which dates are considered close"
+          },
+          {
+            "name": "apply",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Mark found duplicates in the database",
+              "default": false,
+              "title": "Apply"
+            },
+            "description": "Mark found duplicates in the database"
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DuplicateScanResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events": {
+      "post": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Create Event",
+        "description": "Manually create a single event (tenant-scoped).\n\nCustomer keys create under their own customer; admins must supply a\n``customer_id``. Written through the canonical ``save_events`` path\n(``source_id`` NULL, a generated ``external_id``) so both unique constraints\nare respected. The event enters as pending \u2014 review and set\n``status='approved'`` later via ``PUT /events/{id}``.",
+        "operationId": "create_event_events_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "List Events",
+        "description": "List events with pagination and filters.\n\nCustomer-scoped: a customer key only ever sees its own events regardless of\nthe ``customer_id`` param. Use ``upcoming=true`` for future events and\n``status=approved`` for approved-only (combine for future approved events).",
+        "operationId": "list_events_events_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "customer_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by customer ID",
+              "title": "Customer Id"
+            },
+            "description": "Filter by customer ID"
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "name": "source_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by source ID",
+              "title": "Source Id"
+            },
+            "description": "Filter by source ID"
+          },
+          {
+            "name": "category_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category Id"
+            }
+          },
+          {
+            "name": "audience_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Audience Id"
+            }
+          },
+          {
+            "name": "venue_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Venue Id"
+            }
+          },
+          {
+            "name": "is_free",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Free"
+            }
+          },
+          {
+            "name": "start_date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date From"
+            }
+          },
+          {
+            "name": "start_date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date To"
+            }
+          },
+          {
+            "name": "enhancement_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Enhancement Status"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by event status, e.g. 'approved'",
+              "title": "Status"
+            },
+            "description": "Filter by event status, e.g. 'approved'"
+          },
+          {
+            "name": "upcoming",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Only events starting now or in the future",
+              "default": false,
+              "title": "Upcoming"
+            },
+            "description": "Only events starting now or in the future"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "include_duplicates",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Duplicates"
+            }
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/approve": {
+      "post": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Bulk Approve Events",
+        "description": "Approve many events at once (status -> 'approved'). Tenant-scoped.\n\nIn-place approval for API-only customers: rows stay in this database and\nmove to 'approved' (no separate production DB). Only events the caller owns\nare approved; unknown or other-tenant IDs come back in ``not_found``.",
+        "operationId": "bulk_approve_events_events_approve_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkApproveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkApproveResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/stats": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Get Event Stats",
+        "description": "Get event statistics (scoped to the caller's customer for customer keys).",
+        "operationId": "get_event_stats_events_stats_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "customer_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by customer ID",
+              "title": "Customer Id"
+            },
+            "description": "Filter by customer ID"
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventStatsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{event_id}": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Get Event",
+        "description": "Get a single event with full details (tenant-scoped).",
+        "operationId": "get_event_events__event_id__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Update Event",
+        "description": "Update an event (manual corrections). Tenant-scoped.",
+        "operationId": "update_event_events__event_id__put",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Delete Event",
+        "description": "Delete an event (tenant-scoped).",
+        "operationId": "delete_event_events__event_id__delete",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{event_id}/mark-duplicate": {
+      "post": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Mark Event Duplicate",
+        "description": "Mark an event as a duplicate of another (tenant-scoped).",
+        "operationId": "mark_event_duplicate_events__event_id__mark_duplicate_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkDuplicateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{event_id}/approve": {
+      "post": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Approve Event",
+        "description": "Approve an event (status -> 'approved'). Tenant-scoped.\n\nIn-place approval for API-only customers: the row stays in this database and\nmoves to 'approved' (no separate production DB / publish step). Consume\napproved events via ``GET /events?status=approved``.",
+        "operationId": "approve_event_events__event_id__approve_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events/{event_id}/reject": {
+      "post": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Reject Event",
+        "description": "Reject an event (status -> 'rejected'). Tenant-scoped.",
+        "operationId": "reject_event_events__event_id__reject_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/categories": {
+      "get": {
+        "tags": [
+          "categories"
+        ],
+        "summary": "List Categories",
+        "description": "Return categories used by events matching the given filters.\n\nTenant-scoped: a customer key only ever sees categories used by its own\nevents, regardless of the ``customer_id`` param.",
+        "operationId": "list_categories_categories_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "customer_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Id"
+            }
+          },
+          {
+            "name": "start_date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date From"
+            }
+          },
+          {
+            "name": "include_duplicates",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Duplicates"
+            }
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/api__routers__categories__CategoryResponse"
+                  },
+                  "title": "Response List Categories Categories Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audiences": {
+      "get": {
+        "tags": [
+          "audiences"
+        ],
+        "summary": "List Audiences",
+        "description": "Return all audiences.",
+        "operationId": "list_audiences_audiences_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/api__routers__audiences__AudienceResponse"
+                  },
+                  "title": "Response List Audiences Audiences Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Get Me",
+        "description": "Return the authenticated customer's identity and key-relevant config.",
+        "operationId": "get_me_me_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health Check",
+        "description": "Health check endpoint (no authentication required).",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks/{task_id}": {
+      "get": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Get Task Status",
+        "description": "Get the status of a background task.",
+        "operationId": "get_task_status_tasks__task_id__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "api_key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiKeyListItem": {
+        "properties": {
+          "api_key_id": {
+            "type": "integer",
+            "title": "Api Key Id"
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          },
+          "customer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Name"
+          },
+          "customer_city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer City"
+          },
+          "key_name": {
+            "type": "string",
+            "title": "Key Name"
+          },
+          "key_prefix": {
+            "type": "string",
+            "title": "Key Prefix"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "total_requests": {
+            "type": "integer",
+            "title": "Total Requests"
+          },
+          "requests_30d": {
+            "type": "integer",
+            "title": "Requests 30D"
+          },
+          "requests_24h": {
+            "type": "integer",
+            "title": "Requests 24H"
+          }
+        },
+        "type": "object",
+        "required": [
+          "api_key_id",
+          "customer_id",
+          "customer_name",
+          "customer_city",
+          "key_name",
+          "key_prefix",
+          "role",
+          "enabled",
+          "created_at",
+          "expires_at",
+          "revoked_at",
+          "last_used_at",
+          "total_requests",
+          "requests_30d",
+          "requests_24h"
+        ],
+        "title": "ApiKeyListItem",
+        "description": "A key as shown in the admin list (never includes the secret)."
+      },
+      "ApiKeyListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ApiKeyListItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ApiKeyListResponse"
+      },
+      "ApiKeyUsageResponse": {
+        "properties": {
+          "api_key_id": {
+            "type": "integer",
+            "title": "Api Key Id"
+          },
+          "total_requests": {
+            "type": "integer",
+            "title": "Total Requests"
+          },
+          "daily": {
+            "items": {
+              "$ref": "#/components/schemas/UsageDayCount"
+            },
+            "type": "array",
+            "title": "Daily"
+          },
+          "recent": {
+            "items": {
+              "$ref": "#/components/schemas/UsageRequestItem"
+            },
+            "type": "array",
+            "title": "Recent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "api_key_id",
+          "total_requests",
+          "daily",
+          "recent"
+        ],
+        "title": "ApiKeyUsageResponse",
+        "description": "Usage detail for a single key: daily totals + most recent requests."
+      },
+      "ApproveResult": {
+        "properties": {
+          "source_id": {
+            "type": "integer",
+            "title": "Source Id"
+          },
+          "source_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Status"
+          },
+          "last_run_records": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Records"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id"
+        ],
+        "title": "ApproveResult"
+      },
+      "Attachment": {
+        "properties": {
+          "mime": {
+            "type": "string",
+            "title": "Mime",
+            "description": "MIME type, e.g. image/png, image/jpeg, image/webp",
+            "examples": [
+              "image/jpeg"
+            ]
+          },
+          "data_url": {
+            "type": "string",
+            "maxLength": 8000000,
+            "title": "Data Url",
+            "description": "Full data URL: data:<mime>;base64,<...>"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mime",
+          "data_url"
+        ],
+        "title": "Attachment",
+        "description": "A single image attachment for a chat turn (single-turn only \u2014 not persisted into context)."
+      },
+      "Body_upload_csv_discovery_runs__run_id__csv_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_csv_discovery_runs__run_id__csv_post"
+      },
+      "Body_upload_image_public_public_upload_image_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "customer_uuid": {
+            "type": "string",
+            "title": "Customer Uuid",
+            "default": ""
+          },
+          "event_title": {
+            "type": "string",
+            "title": "Event Title",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_image_public_public_upload_image_post"
+      },
+      "BulkApproveRequest": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Ids",
+            "description": "Event IDs to approve."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "BulkApproveRequest",
+        "description": "Request to approve many events at once."
+      },
+      "BulkApproveResponse": {
+        "properties": {
+          "approved": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Approved"
+          },
+          "not_found": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Not Found"
+          }
+        },
+        "type": "object",
+        "required": [
+          "approved",
+          "not_found"
+        ],
+        "title": "BulkApproveResponse",
+        "description": "Result of a bulk approve.\n\n``approved`` lists the IDs moved to 'approved'; ``not_found`` lists IDs that\ndon't exist or belong to another tenant (existence isn't leaked)."
+      },
+      "CategoryOption": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "CategoryOption"
+      },
+      "ChatRequest": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0,
+            "title": "Message",
+            "description": "Natural language message to process. May be empty when an attachment is provided.",
+            "examples": [
+              "Add @greenbenchbrewing on instagram"
+            ]
+          },
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id",
+            "description": "Customer ID (UUID) for multi-tenant isolation",
+            "examples": [
+              "550e8400-e29b-41d4-a716-446655440000"
+            ]
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id",
+            "description": "ID of existing conversation to continue. Omit to start a new conversation."
+          },
+          "context": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context",
+            "description": "Additional context to include in the request"
+          },
+          "attachments": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Attachment"
+                },
+                "type": "array",
+                "maxItems": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attachments",
+            "description": "Image attachments for this turn only. Used by oneoff_screenshot_scrape."
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "customer_id"
+        ],
+        "title": "ChatRequest",
+        "description": "Request for chat endpoint.",
+        "examples": [
+          {
+            "customer_id": "550e8400-e29b-41d4-a716-446655440000",
+            "message": "Add @greenbenchbrewing on instagram"
+          },
+          {
+            "conversation_id": "660e8400-e29b-41d4-a716-446655440001",
+            "customer_id": "550e8400-e29b-41d4-a716-446655440000",
+            "message": "Yes, run it"
+          },
+          {
+            "customer_id": "550e8400-e29b-41d4-a716-446655440000",
+            "message": "List all instagram sources"
+          },
+          {
+            "customer_id": "550e8400-e29b-41d4-a716-446655440000",
+            "message": "Add Green Bench Brewing as a venue"
+          }
+        ]
+      },
+      "ChatResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Natural language response from the assistant"
+          },
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id",
+            "description": "Conversation ID for follow-up messages"
+          },
+          "function_called": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FunctionCallResult"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Details of the function call if one was executed"
+          },
+          "follow_up_suggestion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up Suggestion",
+            "description": "Suggested follow-up action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "conversation_id"
+        ],
+        "title": "ChatResponse",
+        "description": "Response from the chat endpoint.",
+        "examples": [
+          {
+            "conversation_id": "550e8400-e29b-41d4-a716-446655440000",
+            "follow_up_suggestion": "Would you like me to run the first scrape?",
+            "function_called": {
+              "arguments": {
+                "handle": "greenbenchbrewing"
+              },
+              "function_name": "add_instagram_source",
+              "result": {
+                "handle": "greenbenchbrewing",
+                "name": "greenbenchbrewing",
+                "source_id": 42
+              },
+              "success": true
+            },
+            "message": "I've added @greenbenchbrewing as an Instagram source. Would you like me to run the first scrape to fetch their events?"
+          }
+        ]
+      },
+      "ConversationDeleteResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Status of the delete operation",
+            "default": "deleted"
+          },
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id",
+            "description": "ID of the deleted conversation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id"
+        ],
+        "title": "ConversationDeleteResponse",
+        "description": "Response when deleting a conversation."
+      },
+      "CreateApiKeyRequest": {
+        "properties": {
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id",
+            "description": "Customer UUID the key is scoped to. Omit only for an admin key (role='admin')."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Human label for the key, e.g. 'Asheville onboarding'."
+          },
+          "role": {
+            "type": "string",
+            "title": "Role",
+            "description": "'customer' (scoped) or 'admin' (full access).",
+            "default": "customer"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At",
+            "description": "Optional expiry. Null = never expires."
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By",
+            "description": "Who created this key (email/name), for audit."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CreateApiKeyRequest",
+        "description": "Request to issue a new API key."
+      },
+      "CreateApiKeyResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "api_key": {
+            "type": "string",
+            "title": "Api Key",
+            "description": "The full secret key. Shown ONCE \u2014 not retrievable later."
+          },
+          "key_prefix": {
+            "type": "string",
+            "title": "Key Prefix"
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "api_key",
+          "key_prefix",
+          "customer_id",
+          "name",
+          "role",
+          "expires_at",
+          "created_at"
+        ],
+        "title": "CreateApiKeyResponse",
+        "description": "Returned once on creation. ``api_key`` is shown only here \u2014 store it now."
+      },
+      "CreateCustomerRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Customer/organization name."
+          },
+          "city": {
+            "type": "string",
+            "title": "City",
+            "description": "City the customer covers."
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State",
+            "description": "State/region (optional)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "city"
+        ],
+        "title": "CreateCustomerRequest",
+        "description": "Request to create a new customer (city)."
+      },
+      "CreateCustomerResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "city": {
+            "type": "string",
+            "title": "City"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "tenant_config_created": {
+            "type": "boolean",
+            "title": "Tenant Config Created",
+            "description": "Whether a minimal tenant_config row was created (best-effort)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "city",
+          "state",
+          "tenant_config_created"
+        ],
+        "title": "CreateCustomerResponse"
+      },
+      "CsvUploadResult": {
+        "properties": {
+          "rows_accepted": {
+            "type": "integer",
+            "title": "Rows Accepted"
+          },
+          "rows_skipped": {
+            "type": "integer",
+            "title": "Rows Skipped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows_accepted",
+          "rows_skipped"
+        ],
+        "title": "CsvUploadResult"
+      },
+      "CustomerOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "CustomerOut"
+      },
+      "DuplicatePair": {
+        "properties": {
+          "event_id": {
+            "type": "integer",
+            "title": "Event Id"
+          },
+          "event_title": {
+            "type": "string",
+            "title": "Event Title"
+          },
+          "event_start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Start Date"
+          },
+          "duplicate_of_id": {
+            "type": "integer",
+            "title": "Duplicate Of Id"
+          },
+          "duplicate_of_title": {
+            "type": "string",
+            "title": "Duplicate Of Title"
+          },
+          "duplicate_of_start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate Of Start Date"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_id",
+          "event_title",
+          "event_start_date",
+          "duplicate_of_id",
+          "duplicate_of_title",
+          "duplicate_of_start_date",
+          "score"
+        ],
+        "title": "DuplicatePair",
+        "description": "An internal duplicate pair found during scanning."
+      },
+      "DuplicateScanResponse": {
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id"
+          },
+          "total_events_scanned": {
+            "type": "integer",
+            "title": "Total Events Scanned"
+          },
+          "threshold": {
+            "type": "number",
+            "title": "Threshold"
+          },
+          "internal_duplicate_count": {
+            "type": "integer",
+            "title": "Internal Duplicate Count"
+          },
+          "production_duplicate_count": {
+            "type": "integer",
+            "title": "Production Duplicate Count"
+          },
+          "production_api_available": {
+            "type": "boolean",
+            "title": "Production Api Available"
+          },
+          "applied": {
+            "type": "boolean",
+            "title": "Applied"
+          },
+          "internal_duplicates": {
+            "items": {
+              "$ref": "#/components/schemas/DuplicatePair"
+            },
+            "type": "array",
+            "title": "Internal Duplicates"
+          },
+          "production_duplicates": {
+            "items": {
+              "$ref": "#/components/schemas/ProductionDuplicatePair"
+            },
+            "type": "array",
+            "title": "Production Duplicates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_id",
+          "total_events_scanned",
+          "threshold",
+          "internal_duplicate_count",
+          "production_duplicate_count",
+          "production_api_available",
+          "applied",
+          "internal_duplicates",
+          "production_duplicates"
+        ],
+        "title": "DuplicateScanResponse",
+        "description": "Result of a 1-off duplicate scan."
+      },
+      "EnhanceRequest": {
+        "properties": {
+          "batch_size": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Batch Size",
+            "default": 10
+          },
+          "max_events": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Events"
+          },
+          "re_enhance": {
+            "type": "boolean",
+            "title": "Re Enhance",
+            "default": false
+          },
+          "match_venues": {
+            "type": "boolean",
+            "title": "Match Venues",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "EnhanceRequest",
+        "description": "Request to run AI enhancement."
+      },
+      "EnhanceResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "started"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "message"
+        ],
+        "title": "EnhanceResponse",
+        "description": "Response for enhancement operation."
+      },
+      "EventCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Source",
+            "description": "Origin tag for the event; defaults to 'manual'.",
+            "default": "manual"
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "venue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Id"
+          },
+          "venue_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Name"
+          },
+          "venue_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Address"
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "images": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Images"
+          },
+          "price_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Min"
+          },
+          "price_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Max"
+          },
+          "is_free": {
+            "type": "boolean",
+            "title": "Is Free",
+            "default": false
+          },
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "is_recurring": {
+            "type": "boolean",
+            "title": "Is Recurring",
+            "default": false
+          },
+          "recurrence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurrence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "EventCreate",
+        "description": "Schema for manually creating a single event via the API.\n\nTenant and enhancement fields are intentionally not customer-settable:\n``customer_id`` is honored only for admin (master) keys \u2014 customer keys\nalways create under their own tenant \u2014 and status / category_id / audience_id\n/ priority_score are omitted so a manual event enters the normal pending \u2192\nenhancement \u2192 approval flow, just like a scraped one. Approve later via PUT."
+      },
+      "EventInput": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "venue_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Name"
+          },
+          "start_date_formatted": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date Formatted"
+          },
+          "start_date_local": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date Local"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "EventInput"
+      },
+      "EventListItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "venue_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Name"
+          },
+          "venue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Id"
+          },
+          "is_free": {
+            "type": "boolean",
+            "title": "Is Free",
+            "default": false
+          },
+          "category_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Name"
+          },
+          "priority_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority Score"
+          },
+          "enhancement_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enhancement Status"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "audience_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audience Name"
+          },
+          "is_recurring": {
+            "type": "boolean",
+            "title": "Is Recurring",
+            "default": false
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "submitter_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitter Email"
+          },
+          "sponsored": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sponsored"
+          },
+          "images": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Images"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "source"
+        ],
+        "title": "EventListItem",
+        "description": "Simplified event for list responses."
+      },
+      "EventListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EventListItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size",
+          "total_pages"
+        ],
+        "title": "EventListResponse",
+        "description": "Paginated event list response."
+      },
+      "EventResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "external_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Id"
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "venue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Id"
+          },
+          "venue_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Name"
+          },
+          "venue_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Address"
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "images": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Images"
+          },
+          "price_min": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Min"
+          },
+          "price_max": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Max"
+          },
+          "is_free": {
+            "type": "boolean",
+            "title": "Is Free",
+            "default": false
+          },
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "category_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Name"
+          },
+          "audience_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audience Id"
+          },
+          "audience_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audience Name"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/EventTagResponse"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "priority_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority Score"
+          },
+          "is_recurring": {
+            "type": "boolean",
+            "title": "Is Recurring",
+            "default": false
+          },
+          "datetime_verified": {
+            "type": "boolean",
+            "title": "Datetime Verified",
+            "default": false
+          },
+          "duplicate_of_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate Of Id"
+          },
+          "enhancement_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enhancement Status"
+          },
+          "enhanced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enhanced At"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "custom_fields": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "source"
+        ],
+        "title": "EventResponse",
+        "description": "Full event response schema."
+      },
+      "EventStatsResponse": {
+        "properties": {
+          "total_events": {
+            "type": "integer",
+            "title": "Total Events"
+          },
+          "by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Status"
+          },
+          "by_source": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Source"
+          },
+          "by_category": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Category"
+          },
+          "upcoming_count": {
+            "type": "integer",
+            "title": "Upcoming Count"
+          },
+          "duplicate_count": {
+            "type": "integer",
+            "title": "Duplicate Count"
+          },
+          "pending_enhancement": {
+            "type": "integer",
+            "title": "Pending Enhancement"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_events",
+          "by_status",
+          "by_source",
+          "by_category",
+          "upcoming_count",
+          "duplicate_count",
+          "pending_enhancement"
+        ],
+        "title": "EventStatsResponse",
+        "description": "Event statistics response."
+      },
+      "EventTagResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug"
+        ],
+        "title": "EventTagResponse",
+        "description": "Tag in event response."
+      },
+      "EventUpdate": {
+        "properties": {
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "new",
+                  "approved",
+                  "rejected"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "venue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Id"
+          },
+          "venue_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Name"
+          },
+          "venue_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Address"
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          },
+          "is_free": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Free"
+          },
+          "price_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Min"
+          },
+          "price_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Max"
+          },
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "audience_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audience Id"
+          },
+          "priority_score": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority Score"
+          },
+          "images": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Images"
+          }
+        },
+        "type": "object",
+        "title": "EventUpdate",
+        "description": "Schema for updating an event (manual corrections)."
+      },
+      "FunctionCallResult": {
+        "properties": {
+          "function_name": {
+            "type": "string",
+            "title": "Function Name",
+            "description": "Name of the function that was called",
+            "examples": [
+              "add_instagram_source"
+            ]
+          },
+          "arguments": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Arguments",
+            "description": "Arguments passed to the function"
+          },
+          "result": {
+            "title": "Result",
+            "description": "Result data from the function execution"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether the function executed successfully"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Error message if the function failed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "function_name",
+          "arguments",
+          "success"
+        ],
+        "title": "FunctionCallResult",
+        "description": "Result of a function call executed by the chat system."
+      },
+      "GenerateCaptionRequest": {
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventInput"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_id",
+          "events"
+        ],
+        "title": "GenerateCaptionRequest"
+      },
+      "GenerateCaptionResponse": {
+        "properties": {
+          "caption": {
+            "type": "string",
+            "title": "Caption"
+          }
+        },
+        "type": "object",
+        "required": [
+          "caption"
+        ],
+        "title": "GenerateCaptionResponse"
+      },
+      "GenerateCarouselRequest": {
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id",
+            "description": "UUID of the tenant."
+          },
+          "event_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array",
+                "maxItems": 20,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Ids",
+            "description": "Ordered list of DB event IDs. Use this OR events, not both."
+          },
+          "events": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EventInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Events",
+            "description": "Inline event data. Use this OR event_ids, not both."
+          },
+          "options": {
+            "$ref": "#/components/schemas/SocialPostOptions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_id"
+        ],
+        "title": "GenerateCarouselRequest"
+      },
+      "GenerateCarouselResponse": {
+        "properties": {
+          "slides": {
+            "items": {
+              "$ref": "#/components/schemas/SlideResponse"
+            },
+            "type": "array",
+            "title": "Slides"
+          },
+          "caption": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caption"
+          },
+          "template_used": {
+            "type": "string",
+            "title": "Template Used"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slides",
+          "template_used"
+        ],
+        "title": "GenerateCarouselResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "healthy"
+          },
+          "database": {
+            "type": "string",
+            "title": "Database",
+            "default": "connected"
+          }
+        },
+        "type": "object",
+        "title": "HealthResponse",
+        "description": "Health check response."
+      },
+      "KeywordSpec": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Query"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 25.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 5
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "KeywordSpec"
+      },
+      "LocationOption": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "LocationOption"
+      },
+      "MarkDuplicateRequest": {
+        "properties": {
+          "duplicate_of_id": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Duplicate Of Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "duplicate_of_id"
+        ],
+        "title": "MarkDuplicateRequest",
+        "description": "Request to mark event as duplicate."
+      },
+      "MeResponse": {
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "brand_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand Name"
+          },
+          "primary_color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Color"
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          },
+          "allow_venue_creation": {
+            "type": "boolean",
+            "title": "Allow Venue Creation",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_id"
+        ],
+        "title": "MeResponse"
+      },
+      "ProductionDuplicatePair": {
+        "properties": {
+          "event_id": {
+            "type": "integer",
+            "title": "Event Id"
+          },
+          "event_title": {
+            "type": "string",
+            "title": "Event Title"
+          },
+          "event_start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Start Date"
+          },
+          "production_event_id": {
+            "type": "string",
+            "title": "Production Event Id"
+          },
+          "production_event_title": {
+            "type": "string",
+            "title": "Production Event Title"
+          },
+          "production_event_start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Production Event Start Date"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_id",
+          "event_title",
+          "event_start_date",
+          "production_event_id",
+          "production_event_title",
+          "production_event_start_date",
+          "score"
+        ],
+        "title": "ProductionDuplicatePair",
+        "description": "A match between a local event and a production event."
+      },
+      "PromotionTierConfig": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "highlight": {
+            "type": "boolean",
+            "title": "Highlight"
+          },
+          "stripe_price_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stripe Price Id"
+          },
+          "price_display": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Display"
+          },
+          "cta": {
+            "type": "string",
+            "title": "Cta"
+          },
+          "features": {
+            "items": {
+              "$ref": "#/components/schemas/PromotionTierFeature"
+            },
+            "type": "array",
+            "title": "Features"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "highlight",
+          "stripe_price_id",
+          "price_display",
+          "cta",
+          "features"
+        ],
+        "title": "PromotionTierConfig"
+      },
+      "PromotionTierFeature": {
+        "properties": {
+          "emoji": {
+            "type": "string",
+            "title": "Emoji"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "emoji",
+          "label",
+          "description"
+        ],
+        "title": "PromotionTierFeature"
+      },
+      "PublicConfigResponse": {
+        "properties": {
+          "branding": {
+            "$ref": "#/components/schemas/TenantBranding"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagOption"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryOption"
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "venues": {
+            "items": {
+              "$ref": "#/components/schemas/VenueOption"
+            },
+            "type": "array",
+            "title": "Venues"
+          },
+          "locations": {
+            "items": {
+              "$ref": "#/components/schemas/LocationOption"
+            },
+            "type": "array",
+            "title": "Locations"
+          },
+          "promotion_tiers": {
+            "items": {
+              "$ref": "#/components/schemas/PromotionTierConfig"
+            },
+            "type": "array",
+            "title": "Promotion Tiers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "branding",
+          "tags",
+          "categories",
+          "venues",
+          "locations",
+          "promotion_tiers"
+        ],
+        "title": "PublicConfigResponse"
+      },
+      "PublicEventResponse": {
+        "properties": {
+          "event_id": {
+            "type": "integer",
+            "title": "Event Id"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_id",
+          "message"
+        ],
+        "title": "PublicEventResponse"
+      },
+      "PublicEventSubmit": {
+        "properties": {
+          "customer_uuid": {
+            "type": "string",
+            "title": "Customer Uuid"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "submitter_email": {
+            "type": "string",
+            "title": "Submitter Email"
+          },
+          "website_url": {
+            "type": "string",
+            "title": "Website Url"
+          },
+          "address": {
+            "type": "string",
+            "title": "Address"
+          },
+          "venue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Id"
+          },
+          "venue_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Name"
+          },
+          "location_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Id"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "is_free": {
+            "type": "boolean",
+            "title": "Is Free",
+            "default": false
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "tags": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Categories",
+            "default": []
+          },
+          "image_urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Image Urls",
+            "default": []
+          },
+          "recurrence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recurrence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_uuid",
+          "title",
+          "description",
+          "submitter_email",
+          "website_url",
+          "address"
+        ],
+        "title": "PublicEventSubmit"
+      },
+      "RawSourceOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "venue_matching": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Matching"
+          },
+          "venue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Id"
+          },
+          "venue_guess_confidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Guess Confidence"
+          },
+          "event_count": {
+            "type": "integer",
+            "title": "Event Count",
+            "default": 0
+          },
+          "source_keyword": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Keyword"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "processing_status": {
+            "type": "string",
+            "title": "Processing Status",
+            "default": "unprocessed"
+          },
+          "processing_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processing Error"
+          },
+          "approved_source_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved Source Id"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "run_id",
+          "customer_id",
+          "name",
+          "url",
+          "status"
+        ],
+        "title": "RawSourceOut"
+      },
+      "RawSourcePatch": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "venue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Id"
+          },
+          "venue_matching": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(venue_specific|broad_source)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Matching"
+          }
+        },
+        "type": "object",
+        "title": "RawSourcePatch"
+      },
+      "RunCreate": {
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id"
+          },
+          "location_city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location City"
+          },
+          "location_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location State"
+          },
+          "keywords": {
+            "items": {
+              "$ref": "#/components/schemas/KeywordSpec"
+            },
+            "type": "array",
+            "title": "Keywords"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_id"
+        ],
+        "title": "RunCreate"
+      },
+      "RunCreated": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id"
+        ],
+        "title": "RunCreated"
+      },
+      "ScraperLogListResponse": {
+        "properties": {
+          "logs": {
+            "items": {
+              "$ref": "#/components/schemas/ScraperLogResponse"
+            },
+            "type": "array",
+            "title": "Logs"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "logs",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "ScraperLogListResponse",
+        "description": "Response schema for paginated list of scraper logs."
+      },
+      "ScraperLogResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "source_id": {
+            "type": "integer",
+            "title": "Source Id"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "duration_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Seconds"
+          },
+          "trigger_type": {
+            "type": "string",
+            "title": "Trigger Type"
+          },
+          "records_extracted": {
+            "type": "integer",
+            "title": "Records Extracted",
+            "default": 0
+          },
+          "records_inserted": {
+            "type": "integer",
+            "title": "Records Inserted",
+            "default": 0
+          },
+          "records_updated": {
+            "type": "integer",
+            "title": "Records Updated",
+            "default": 0
+          },
+          "scrape_status": {
+            "type": "string",
+            "title": "Scrape Status",
+            "default": "running"
+          },
+          "scrape_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scrape Error"
+          },
+          "enhancement_ran": {
+            "type": "boolean",
+            "title": "Enhancement Ran",
+            "default": false
+          },
+          "enhancement_processed": {
+            "type": "integer",
+            "title": "Enhancement Processed",
+            "default": 0
+          },
+          "enhancement_enhanced": {
+            "type": "integer",
+            "title": "Enhancement Enhanced",
+            "default": 0
+          },
+          "enhancement_duplicates": {
+            "type": "integer",
+            "title": "Enhancement Duplicates",
+            "default": 0
+          },
+          "enhancement_venues_matched": {
+            "type": "integer",
+            "title": "Enhancement Venues Matched",
+            "default": 0
+          },
+          "enhancement_venues_created": {
+            "type": "integer",
+            "title": "Enhancement Venues Created",
+            "default": 0
+          },
+          "enhancement_errors": {
+            "type": "integer",
+            "title": "Enhancement Errors",
+            "default": 0
+          },
+          "enhancement_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enhancement Status"
+          },
+          "enhancement_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enhancement Error"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "source_id",
+          "started_at",
+          "trigger_type",
+          "status"
+        ],
+        "title": "ScraperLogResponse",
+        "description": "Response schema for scraper log entries."
+      },
+      "SlideResponse": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "slide_type": {
+            "type": "string",
+            "title": "Slide Type"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "slide_type"
+        ],
+        "title": "SlideResponse"
+      },
+      "SocialPostOptions": {
+        "properties": {
+          "cover_headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Headline",
+            "description": "Override for the cover slide headline. Defaults to 'Top Events This Weekend in {city}'."
+          },
+          "include_caption": {
+            "type": "boolean",
+            "title": "Include Caption",
+            "description": "Whether to generate an Instagram caption via AI.",
+            "default": true
+          },
+          "template_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Name",
+            "description": "Template to use. Overrides the tenant's configured template."
+          },
+          "cover_image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image Url",
+            "description": "Background image URL for cover/end slides. Falls back to DB config or first event image."
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url",
+            "description": "Logo image URL. Falls back to DB config."
+          }
+        },
+        "type": "object",
+        "title": "SocialPostOptions"
+      },
+      "SourceCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "pattern": "^(ticketmaster|instagram|website|facebook)$",
+            "title": "Type"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config"
+          },
+          "venue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Id"
+          },
+          "venue_matching": {
+            "type": "string",
+            "pattern": "^(venue_specific|broad_source)$",
+            "title": "Venue Matching",
+            "default": "broad_source"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "extraction_hints": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Hints"
+          },
+          "scrape_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scrape Mode"
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "SourceCreate",
+        "description": "Schema for creating a source."
+      },
+      "SourceResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config"
+          },
+          "venue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Id"
+          },
+          "venue_matching": {
+            "type": "string",
+            "title": "Venue Matching"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "extraction_hints": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Hints"
+          },
+          "scrape_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scrape Mode"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run"
+          },
+          "last_run_records": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Records"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "type",
+          "config",
+          "venue_matching",
+          "enabled"
+        ],
+        "title": "SourceResponse",
+        "description": "Source response schema."
+      },
+      "SourceRunResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "started"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "log_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Log Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "message"
+        ],
+        "title": "SourceRunResponse",
+        "description": "Response for source run operation."
+      },
+      "SourceUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "venue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Id"
+          },
+          "venue_matching": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(venue_specific|broad_source)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue Matching"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "extraction_hints": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Hints"
+          },
+          "scrape_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scrape Mode"
+          }
+        },
+        "type": "object",
+        "title": "SourceUpdate",
+        "description": "Schema for updating a source."
+      },
+      "StatusResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message"
+        ],
+        "title": "StatusResponse",
+        "description": "Generic status response."
+      },
+      "StripeCheckoutRequest": {
+        "properties": {
+          "customer_uuid": {
+            "type": "string",
+            "title": "Customer Uuid"
+          },
+          "tier_id": {
+            "type": "string",
+            "title": "Tier Id"
+          },
+          "event": {
+            "$ref": "#/components/schemas/PublicEventSubmit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_uuid",
+          "tier_id",
+          "event"
+        ],
+        "title": "StripeCheckoutRequest"
+      },
+      "StripeCheckoutResponse": {
+        "properties": {
+          "checkout_url": {
+            "type": "string",
+            "title": "Checkout Url"
+          },
+          "event_id": {
+            "type": "integer",
+            "title": "Event Id"
+          },
+          "payment_id": {
+            "type": "integer",
+            "title": "Payment Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "checkout_url",
+          "event_id",
+          "payment_id"
+        ],
+        "title": "StripeCheckoutResponse"
+      },
+      "TagOption": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "TagOption"
+      },
+      "TagResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug"
+        ],
+        "title": "TagResponse",
+        "description": "Tag response schema."
+      },
+      "TaskResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "status",
+          "message"
+        ],
+        "title": "TaskResponse",
+        "description": "Response for background task operations."
+      },
+      "TaskStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "started",
+          "running",
+          "completed",
+          "failed"
+        ],
+        "title": "TaskStatus",
+        "description": "Status of a background task."
+      },
+      "TenantBranding": {
+        "properties": {
+          "brand_name": {
+            "type": "string",
+            "title": "Brand Name"
+          },
+          "primary_color": {
+            "type": "string",
+            "title": "Primary Color"
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "stripe_featured_price_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stripe Featured Price Id"
+          },
+          "stripe_account_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stripe Account Id"
+          },
+          "featured_price_display": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Featured Price Display"
+          }
+        },
+        "type": "object",
+        "required": [
+          "brand_name",
+          "primary_color",
+          "logo_url",
+          "city",
+          "stripe_featured_price_id",
+          "stripe_account_id",
+          "featured_price_display"
+        ],
+        "title": "TenantBranding"
+      },
+      "TenantConfigResponse": {
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id",
+            "description": "Customer UUID"
+          },
+          "allow_venue_creation": {
+            "type": "boolean",
+            "title": "Allow Venue Creation",
+            "description": "Whether the customer is allowed to create venues via chat / admin UI."
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_id",
+          "allow_venue_creation"
+        ],
+        "title": "TenantConfigResponse"
+      },
+      "UpdatePromotionTiersRequest": {
+        "properties": {
+          "customerUuid": {
+            "type": "string",
+            "title": "Customeruuid"
+          },
+          "promotionTiers": {
+            "title": "Promotiontiers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customerUuid",
+          "promotionTiers"
+        ],
+        "title": "UpdatePromotionTiersRequest"
+      },
+      "UsageDayCount": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "title": "Day"
+          },
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "requests"
+        ],
+        "title": "UsageDayCount"
+      },
+      "UsageRequestItem": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "status_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Code"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method",
+          "path",
+          "status_code",
+          "duration_ms",
+          "created_at"
+        ],
+        "title": "UsageRequestItem"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VenueCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "zip_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zip Code"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "VenueCreate",
+        "description": "Schema for creating a venue."
+      },
+      "VenueDiscoveryRequest": {
+        "properties": {
+          "searchQuery": {
+            "type": "string",
+            "title": "Searchquery"
+          },
+          "location": {
+            "type": "string",
+            "title": "Location"
+          },
+          "domainSlug": {
+            "type": "string",
+            "title": "Domainslug"
+          },
+          "projectApiKey": {
+            "type": "string",
+            "title": "Projectapikey"
+          },
+          "serpApiKey": {
+            "type": "string",
+            "title": "Serpapikey"
+          },
+          "cloudinaryCloudName": {
+            "type": "string",
+            "title": "Cloudinarycloudname"
+          },
+          "cloudinaryFolder": {
+            "type": "string",
+            "title": "Cloudinaryfolder"
+          },
+          "cloudinaryApiKey": {
+            "type": "string",
+            "title": "Cloudinaryapikey"
+          },
+          "cloudinaryTimestamp": {
+            "type": "string",
+            "title": "Cloudinarytimestamp"
+          },
+          "cloudinarySignature": {
+            "type": "string",
+            "title": "Cloudinarysignature"
+          },
+          "maxResults": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Maxresults",
+            "default": 10
+          }
+        },
+        "type": "object",
+        "required": [
+          "searchQuery",
+          "location",
+          "domainSlug",
+          "projectApiKey",
+          "serpApiKey",
+          "cloudinaryCloudName",
+          "cloudinaryFolder",
+          "cloudinaryApiKey",
+          "cloudinaryTimestamp",
+          "cloudinarySignature"
+        ],
+        "title": "VenueDiscoveryRequest"
+      },
+      "VenueListItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "VenueListItem",
+        "description": "Simplified venue for list responses."
+      },
+      "VenueOption": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "address"
+        ],
+        "title": "VenueOption"
+      },
+      "VenueOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "VenueOut"
+      },
+      "VenueResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "zip_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zip Code"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
+          "reviews_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviews Count"
+          },
+          "price_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Level"
+          },
+          "images": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Images"
+          },
+          "hours": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hours"
+          },
+          "serpapi_place_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serpapi Place Id"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "VenueResponse",
+        "description": "Full venue response schema."
+      },
+      "VenueSearchRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "create_if_found": {
+            "type": "boolean",
+            "title": "Create If Found",
+            "description": "If True, create the venue in database if found via search",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "VenueSearchRequest",
+        "description": "Request for venue search via SerpAPI."
+      },
+      "VenueSearchResponse": {
+        "properties": {
+          "found": {
+            "type": "boolean",
+            "title": "Found"
+          },
+          "venue": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VenueResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created",
+            "default": false
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "found",
+          "message"
+        ],
+        "title": "VenueSearchResponse",
+        "description": "Response for venue search."
+      },
+      "VenueUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "zip_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zip Code"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          }
+        },
+        "type": "object",
+        "title": "VenueUpdate",
+        "description": "Schema for updating a venue."
+      },
+      "api__routers__audiences__AudienceResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "AudienceResponse"
+      },
+      "api__routers__categories__CategoryResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "CategoryResponse"
+      },
+      "api__schemas__enhancement__AudienceResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug"
+        ],
+        "title": "AudienceResponse",
+        "description": "Audience response schema."
+      },
+      "api__schemas__enhancement__CategoryResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug"
+        ],
+        "title": "CategoryResponse",
+        "description": "Category response schema."
+      }
+    },
+    "securitySchemes": {
+      "APIKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "https://whatsgoodapi.up.railway.app"
+    }
+  ]
+}
