@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Whats Good Customer API",
-    "description": "REST API for a city/customer to manage their own event pipeline: register **sources** to scrape, review incoming **events**, approve the good ones, and read back the approved feed.\n\n## Authentication\nSend your key in the **`X-API-Key`** header (or `?api_key=` query param). Your key is scoped to one customer \u2014 you only ever see/modify your own data (another tenant's record returns 404; passing another `customer_id` returns 403).\n\n## Workflow\n1. `GET /me` \u2014 confirm which city the key is wired to\n2. `POST /sources` \u2014 register a source (auto-runs a scrape)\n3. `GET /events?status=new` \u2014 review what was scraped\n4. `POST /events/approve` \u2014 approve a batch (or `/events/{id}/approve`)\n5. `GET /events?status=approved&upcoming=true` \u2014 the live feed\n\nEvents flow `new \u2192 approved | rejected`. Approval is in place \u2014 the event stays in this database and flips to `approved`.\n",
+    "title": "Whats Good API",
+    "description": "Manage your event pipeline: add **sources** to scrape, review incoming **events**, approve the ones you want, and read back your published feed.\n\n## Authentication\nSend your API key in the **`X-API-Key`** header (or `?api_key=` query param) on every request:\n\n```\ncurl https://whatsgoodapi.up.railway.app/me -H \"X-API-Key: YOUR_KEY\"\n```\n\nEvery request operates on **your account** \u2014 you never pass an account id, it's inferred from your key.\n\n## Workflow\n1. `GET /me` \u2014 confirm your account\n2. `POST /sources` \u2014 add a source (this starts a scrape)\n3. `GET /events?status=new` \u2014 review what was found\n4. `POST /events/approve` \u2014 approve a batch\n5. `GET /events?status=approved&upcoming=true` \u2014 your live feed\n\nEvents move `new \u2192 approved | rejected`. Approving an event publishes it to your feed.\n",
     "version": "1.0.0"
   },
   "paths": {
@@ -12,7 +12,7 @@
           "sources"
         ],
         "summary": "List Sources",
-        "description": "List all sources with optional filters (tenant-scoped for customer keys).",
+        "description": "List your sources.",
         "operationId": "list_sources_sources_get",
         "security": [
           {
@@ -55,24 +55,6 @@
               "title": "Enabled"
             },
             "description": "Filter by enabled status"
-          },
-          {
-            "name": "customer_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Filter by customer ID",
-              "title": "Customer Id"
-            },
-            "description": "Filter by customer ID"
           },
           {
             "name": "api_key",
@@ -123,7 +105,7 @@
           "sources"
         ],
         "summary": "Create Source",
-        "description": "Create a new source and automatically run it.\n\nCustomer keys always create under their own customer; admins must supply a\n``customer_id`` (the column is NOT NULL).",
+        "description": "Add a source. Creating it immediately starts a scrape in the background; new events arrive with status `new`.",
         "operationId": "create_source_sources_post",
         "security": [
           {
@@ -188,7 +170,7 @@
           "sources"
         ],
         "summary": "Get Source",
-        "description": "Get a single source by ID (tenant-scoped).",
+        "description": "Get one of your sources.",
         "operationId": "get_source_sources__source_id__get",
         "security": [
           {
@@ -250,7 +232,7 @@
           "sources"
         ],
         "summary": "Update Source",
-        "description": "Update a source (tenant-scoped).",
+        "description": "Update one of your sources. Send only the fields you want to change.",
         "operationId": "update_source_sources__source_id__put",
         "security": [
           {
@@ -322,7 +304,7 @@
           "sources"
         ],
         "summary": "Delete Source",
-        "description": "Delete a source. By default keeps events (sets source_id = NULL). Pass clear_events=true to delete associated events.",
+        "description": "Delete a source. By default its events are kept; pass `clear_events=true` to delete them too.",
         "operationId": "delete_source_sources__source_id__delete",
         "security": [
           {
@@ -391,7 +373,7 @@
           "sources"
         ],
         "summary": "Run Source",
-        "description": "Run the scraper for a specific source (background task). Tenant-scoped.",
+        "description": "Run a source's scraper now. Returns a background task you can poll via `GET /tasks/{task_id}`.",
         "operationId": "run_source_sources__source_id__run_post",
         "security": [
           {
@@ -485,7 +467,7 @@
           "sources"
         ],
         "summary": "List Source Logs",
-        "description": "Get the log history for a specific source (tenant-scoped).",
+        "description": "List a source's run history (scrape counts, status, errors).",
         "operationId": "list_source_logs_sources__source_id__logs_get",
         "security": [
           {
@@ -576,7 +558,7 @@
           "sources"
         ],
         "summary": "Get Source Log",
-        "description": "Get a single log entry for a source (tenant-scoped).",
+        "description": "Get a single source run log.",
         "operationId": "get_source_log_sources__source_id__logs__log_id__get",
         "security": [
           {
@@ -643,118 +625,13 @@
         }
       }
     },
-    "/events/duplicate-scan": {
-      "post": {
-        "tags": [
-          "events"
-        ],
-        "summary": "Scan Customer Duplicates",
-        "description": "Run a 1-off duplicate scan for a specific customer and return full results.\n\nRuns two checks against all non-duplicate events for the customer:\n\n1. **Internal**: compares every event against every other event in the local\n   database to find pairs that are likely the same event.\n2. **Production**: compares every event against the customer's production\n   database (via the external API) to find events that may already be live.\n\nIf `apply=true`, internal duplicates are written to the database:\n`duplicate_of_id` is set and `enhancement_status` is set to `'duplicate'`.\nProduction matches are reported only (they reference an external ID).",
-        "operationId": "scan_customer_duplicates_events_duplicate_scan_post",
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "customer_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Customer UUID to scan for duplicates",
-              "title": "Customer Id"
-            },
-            "description": "Customer UUID to scan for duplicates"
-          },
-          {
-            "name": "threshold",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "number",
-              "maximum": 1.0,
-              "minimum": 0.0,
-              "description": "Similarity score threshold (0\u20131)",
-              "default": 0.85,
-              "title": "Threshold"
-            },
-            "description": "Similarity score threshold (0\u20131)"
-          },
-          {
-            "name": "date_proximity_hours",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "description": "Hours within which dates are considered close",
-              "default": 24,
-              "title": "Date Proximity Hours"
-            },
-            "description": "Hours within which dates are considered close"
-          },
-          {
-            "name": "apply",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "description": "Mark found duplicates in the database",
-              "default": false,
-              "title": "Apply"
-            },
-            "description": "Mark found duplicates in the database"
-          },
-          {
-            "name": "api_key",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Api Key"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DuplicateScanResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/events": {
       "post": {
         "tags": [
           "events"
         ],
         "summary": "Create Event",
-        "description": "Manually create a single event (tenant-scoped).\n\nCustomer keys create under their own customer; admins must supply a\n``customer_id``. Written through the canonical ``save_events`` path\n(``source_id`` NULL, a generated ``external_id``) so both unique constraints\nare respected. The event enters as pending \u2014 review and set\n``status='approved'`` later via ``PUT /events/{id}``.",
+        "description": "Manually add a single event. It enters with status `new` for review.",
         "operationId": "create_event_events_post",
         "security": [
           {
@@ -817,7 +694,7 @@
           "events"
         ],
         "summary": "List Events",
-        "description": "List events with pagination and filters.\n\nCustomer-scoped: a customer key only ever sees its own events regardless of\nthe ``customer_id`` param. Use ``upcoming=true`` for future events and\n``status=approved`` for approved-only (combine for future approved events).",
+        "description": "List your events with filtering and pagination. Use `status=approved&upcoming=true` for your live feed.",
         "operationId": "list_events_events_get",
         "security": [
           {
@@ -847,24 +724,6 @@
               "default": 20,
               "title": "Page Size"
             }
-          },
-          {
-            "name": "customer_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Filter by customer ID",
-              "title": "Customer Id"
-            },
-            "description": "Filter by customer ID"
           },
           {
             "name": "source",
@@ -1115,7 +974,7 @@
           "events"
         ],
         "summary": "Bulk Approve Events",
-        "description": "Approve many events at once (status -> 'approved'). Tenant-scoped.\n\nIn-place approval for API-only customers: rows stay in this database and\nmove to 'approved' (no separate production DB). Only events the caller owns\nare approved; unknown or other-tenant IDs come back in ``not_found``.",
+        "description": "Approve multiple events at once. Returns which ids were approved; unknown ids come back under `not_found`.",
         "operationId": "bulk_approve_events_events_approve_post",
         "security": [
           {
@@ -1180,7 +1039,7 @@
           "events"
         ],
         "summary": "Get Event Stats",
-        "description": "Get event statistics (scoped to the caller's customer for customer keys).",
+        "description": "Summary counts of your events (by status, source, category, upcoming, and more).",
         "operationId": "get_event_stats_events_stats_get",
         "security": [
           {
@@ -1188,24 +1047,6 @@
           }
         ],
         "parameters": [
-          {
-            "name": "customer_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Filter by customer ID",
-              "title": "Customer Id"
-            },
-            "description": "Filter by customer ID"
-          },
           {
             "name": "api_key",
             "in": "query",
@@ -1253,7 +1094,7 @@
           "events"
         ],
         "summary": "Get Event",
-        "description": "Get a single event with full details (tenant-scoped).",
+        "description": "Get one of your events in full.",
         "operationId": "get_event_events__event_id__get",
         "security": [
           {
@@ -1315,7 +1156,7 @@
           "events"
         ],
         "summary": "Update Event",
-        "description": "Update an event (manual corrections). Tenant-scoped.",
+        "description": "Edit one of your events. `status` must be `new`, `approved`, or `rejected`.",
         "operationId": "update_event_events__event_id__put",
         "security": [
           {
@@ -1387,7 +1228,7 @@
           "events"
         ],
         "summary": "Delete Event",
-        "description": "Delete an event (tenant-scoped).",
+        "description": "Delete one of your events.",
         "operationId": "delete_event_events__event_id__delete",
         "security": [
           {
@@ -1444,7 +1285,7 @@
           "events"
         ],
         "summary": "Mark Event Duplicate",
-        "description": "Mark an event as a duplicate of another (tenant-scoped).",
+        "description": "Mark an event as a duplicate of another of your events.",
         "operationId": "mark_event_duplicate_events__event_id__mark_duplicate_post",
         "security": [
           {
@@ -1518,7 +1359,7 @@
           "events"
         ],
         "summary": "Approve Event",
-        "description": "Approve an event (status -> 'approved'). Tenant-scoped.\n\nIn-place approval for API-only customers: the row stays in this database and\nmoves to 'approved' (no separate production DB / publish step). Consume\napproved events via ``GET /events?status=approved``.",
+        "description": "Approve an event (status \u2192 `approved`). Approved events appear under `GET /events?status=approved`.",
         "operationId": "approve_event_events__event_id__approve_post",
         "security": [
           {
@@ -1582,7 +1423,7 @@
           "events"
         ],
         "summary": "Reject Event",
-        "description": "Reject an event (status -> 'rejected'). Tenant-scoped.",
+        "description": "Reject an event (status \u2192 `rejected`).",
         "operationId": "reject_event_events__event_id__reject_post",
         "security": [
           {
@@ -1646,7 +1487,7 @@
           "categories"
         ],
         "summary": "List Categories",
-        "description": "Return categories used by events matching the given filters.\n\nTenant-scoped: a customer key only ever sees categories used by its own\nevents, regardless of the ``customer_id`` param.",
+        "description": "List the event categories that appear in your events.",
         "operationId": "list_categories_categories_get",
         "security": [
           {
@@ -1654,22 +1495,6 @@
           }
         ],
         "parameters": [
-          {
-            "name": "customer_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Customer Id"
-            }
-          },
           {
             "name": "start_date_from",
             "in": "query",
@@ -1747,7 +1572,7 @@
           "audiences"
         ],
         "summary": "List Audiences",
-        "description": "Return all audiences.",
+        "description": "List the available audience types you can assign to events.",
         "operationId": "list_audiences_audiences_get",
         "security": [
           {
@@ -1806,7 +1631,7 @@
           "me"
         ],
         "summary": "Get Me",
-        "description": "Return the authenticated customer's identity and key-relevant config.",
+        "description": "Return your account details (city, branding, settings).",
         "operationId": "get_me_me_get",
         "security": [
           {
@@ -1861,7 +1686,7 @@
           "health"
         ],
         "summary": "Health Check",
-        "description": "Health check endpoint (no authentication required).",
+        "description": "Service health check (no key required).",
         "operationId": "health_check_health_get",
         "responses": {
           "200": {
@@ -1883,7 +1708,7 @@
           "tasks"
         ],
         "summary": "Get Task Status",
-        "description": "Get the status of a background task.",
+        "description": "Check the status of a background task (e.g. a source run).",
         "operationId": "get_task_status_tasks__task_id__get",
         "security": [
           {
@@ -1985,127 +1810,7 @@
           "not_found"
         ],
         "title": "BulkApproveResponse",
-        "description": "Result of a bulk approve.\n\n``approved`` lists the IDs moved to 'approved'; ``not_found`` lists IDs that\ndon't exist or belong to another tenant (existence isn't leaked)."
-      },
-      "DuplicatePair": {
-        "properties": {
-          "event_id": {
-            "type": "integer",
-            "title": "Event Id"
-          },
-          "event_title": {
-            "type": "string",
-            "title": "Event Title"
-          },
-          "event_start_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Event Start Date"
-          },
-          "duplicate_of_id": {
-            "type": "integer",
-            "title": "Duplicate Of Id"
-          },
-          "duplicate_of_title": {
-            "type": "string",
-            "title": "Duplicate Of Title"
-          },
-          "duplicate_of_start_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Duplicate Of Start Date"
-          },
-          "score": {
-            "type": "number",
-            "title": "Score"
-          }
-        },
-        "type": "object",
-        "required": [
-          "event_id",
-          "event_title",
-          "event_start_date",
-          "duplicate_of_id",
-          "duplicate_of_title",
-          "duplicate_of_start_date",
-          "score"
-        ],
-        "title": "DuplicatePair",
-        "description": "An internal duplicate pair found during scanning."
-      },
-      "DuplicateScanResponse": {
-        "properties": {
-          "customer_id": {
-            "type": "string",
-            "title": "Customer Id"
-          },
-          "total_events_scanned": {
-            "type": "integer",
-            "title": "Total Events Scanned"
-          },
-          "threshold": {
-            "type": "number",
-            "title": "Threshold"
-          },
-          "internal_duplicate_count": {
-            "type": "integer",
-            "title": "Internal Duplicate Count"
-          },
-          "production_duplicate_count": {
-            "type": "integer",
-            "title": "Production Duplicate Count"
-          },
-          "production_api_available": {
-            "type": "boolean",
-            "title": "Production Api Available"
-          },
-          "applied": {
-            "type": "boolean",
-            "title": "Applied"
-          },
-          "internal_duplicates": {
-            "items": {
-              "$ref": "#/components/schemas/DuplicatePair"
-            },
-            "type": "array",
-            "title": "Internal Duplicates"
-          },
-          "production_duplicates": {
-            "items": {
-              "$ref": "#/components/schemas/ProductionDuplicatePair"
-            },
-            "type": "array",
-            "title": "Production Duplicates"
-          }
-        },
-        "type": "object",
-        "required": [
-          "customer_id",
-          "total_events_scanned",
-          "threshold",
-          "internal_duplicate_count",
-          "production_duplicate_count",
-          "production_api_available",
-          "applied",
-          "internal_duplicates",
-          "production_duplicates"
-        ],
-        "title": "DuplicateScanResponse",
-        "description": "Result of a 1-off duplicate scan."
+        "description": "Result of approving multiple events. `approved` lists the ids that were set to approved; `not_found` lists ids that do not exist in your account."
       },
       "EventCreate": {
         "properties": {
@@ -2132,17 +1837,6 @@
             "title": "Source",
             "description": "Origin tag for the event; defaults to 'manual'.",
             "default": "manual"
-          },
-          "customer_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Customer Id"
           },
           "start_date": {
             "anyOf": [
@@ -2305,7 +1999,7 @@
           "title"
         ],
         "title": "EventCreate",
-        "description": "Schema for manually creating a single event via the API.\n\nTenant and enhancement fields are intentionally not customer-settable:\n``customer_id`` is honored only for admin (master) keys \u2014 customer keys\nalways create under their own tenant \u2014 and status / category_id / audience_id\n/ priority_score are omitted so a manual event enters the normal pending \u2192\nenhancement \u2192 approval flow, just like a scraped one. Approve later via PUT."
+        "description": "Fields for manually adding a single event. Only `title` is required; the new event enters with status `new` for review. Classification (category/audience) and status are set later during review."
       },
       "EventListItem": {
         "properties": {
@@ -2965,17 +2659,6 @@
       },
       "EventUpdate": {
         "properties": {
-          "customer_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Customer Id"
-          },
           "title": {
             "anyOf": [
               {
@@ -3317,65 +3000,6 @@
         ],
         "title": "MeResponse"
       },
-      "ProductionDuplicatePair": {
-        "properties": {
-          "event_id": {
-            "type": "integer",
-            "title": "Event Id"
-          },
-          "event_title": {
-            "type": "string",
-            "title": "Event Title"
-          },
-          "event_start_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Event Start Date"
-          },
-          "production_event_id": {
-            "type": "string",
-            "title": "Production Event Id"
-          },
-          "production_event_title": {
-            "type": "string",
-            "title": "Production Event Title"
-          },
-          "production_event_start_date": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Production Event Start Date"
-          },
-          "score": {
-            "type": "number",
-            "title": "Score"
-          }
-        },
-        "type": "object",
-        "required": [
-          "event_id",
-          "event_title",
-          "event_start_date",
-          "production_event_id",
-          "production_event_title",
-          "production_event_start_date",
-          "score"
-        ],
-        "title": "ProductionDuplicatePair",
-        "description": "A match between a local event and a production event."
-      },
       "ScraperLogListResponse": {
         "properties": {
           "logs": {
@@ -3627,17 +3251,6 @@
               }
             ],
             "title": "Scrape Mode"
-          },
-          "customer_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Customer Id"
           }
         },
         "type": "object",

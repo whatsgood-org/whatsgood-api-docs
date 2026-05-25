@@ -1,43 +1,34 @@
-# Whats Good — Customer API Guide
+# Whats Good — API Guide
 
-A REST API for a single city/customer to manage their own event pipeline:
-register **sources** (sites/feeds to scrape), review the **events** that come in,
-approve the good ones, and read back the approved feed.
-
-> This guide covers **only what a per-customer API key can do.** Admin/ops
-> endpoints exist but are not accessible with a customer key — see
-> [Out of scope](#out-of-scope).
+A REST API to manage your event pipeline: register **sources** (sites/feeds to
+scrape), review the **events** that come in, approve the good ones, and read back
+your approved feed.
 
 - **Base URL:** `https://whatsgoodapi.up.railway.app`
-- **Interactive reference:** `/docs` (Swagger) · `/redoc` · `/openapi.json`
+- **Interactive reference:** [`/reference.html`](./reference.html)
 
 ---
 
 ## Authentication
 
-Every request must send your key in the **`X-API-Key`** header (or, if headers
-aren't possible, the `?api_key=` query param):
+Send your key in the **`X-API-Key`** header (or, if headers aren't possible, the
+`?api_key=` query param) on every request:
 
 ```bash
 curl https://whatsgoodapi.up.railway.app/me \
-  -H "X-API-Key: wg_live_YOUR_KEY"
+  -H "X-API-Key: YOUR_KEY"
 ```
 
-Your key is **scoped to one customer (city)**. You automatically see and modify
-only your own data:
+Every request operates on **your account** — you never pass an account id, it's
+inferred from your key.
 
-- A `customer_id` is never required from you — it's inferred from the key. If you
-  pass one that isn't yours, you get **403**.
-- Another tenant's record (by id) responds **404**, never their data.
-
-### Auth errors
+### Errors
 
 | Status | Meaning |
 |--------|---------|
 | `401` | Missing or invalid API key |
-| `403` | Valid key, but you tried to act on another customer |
-| `404` | Record doesn't exist **or** belongs to another customer |
-| `422` | Request body/params failed validation |
+| `404` | No such item in your account |
+| `422` | Request body or query params failed validation |
 
 ---
 
@@ -45,9 +36,9 @@ only your own data:
 
 ```bash
 BASE=https://whatsgoodapi.up.railway.app
-KEY="wg_live_YOUR_KEY"
+KEY="YOUR_KEY"
 
-# 1. Confirm which city this key is wired to
+# 1. Confirm your account
 curl -s "$BASE/me" -H "X-API-Key: $KEY"
 
 # 2. Register a source — this AUTO-RUNS a scrape in the background
@@ -60,35 +51,34 @@ curl -s -X POST "$BASE/sources" -H "X-API-Key: $KEY" -H "Content-Type: applicati
 # 3. Watch the run (use the source id from step 2)
 curl -s "$BASE/sources/123/logs?limit=1" -H "X-API-Key: $KEY"
 
-# 4. Review what was scraped (newest events arrive as status="new")
+# 4. Review what was scraped (new events arrive as status="new")
 curl -s "$BASE/events?status=new&page_size=50" -H "X-API-Key: $KEY"
 
 # 5. Approve the good ones (single, or bulk)
 curl -s -X POST "$BASE/events/456/approve" -H "X-API-Key: $KEY"
 curl -s -X POST "$BASE/events/approve" -H "X-API-Key: $KEY" -H "Content-Type: application/json" -d '{"ids":[456,457,458]}'
 
-# 6. Read the live, approved, upcoming feed
+# 6. Read your live, approved, upcoming feed
 curl -s "$BASE/events?status=approved&upcoming=true" -H "X-API-Key: $KEY"
 ```
 
-**Event lifecycle:** every event (scraped or manually created) starts as
-`status="new"`. You review, then move it to `approved` or `rejected`. Approval is
-**in place** — the event stays in this database and simply flips to `approved`.
+**Event lifecycle:** every event (scraped or manually added) starts as
+`status="new"`. You review, then move it to `approved` or `rejected`. Approving
+an event publishes it to your feed.
 
 ---
 
 ## Identity
 
 ### `GET /me`
-Returns the customer (city) this key belongs to.
+Returns your account (city, branding, settings).
 
 ```json
 {
-  "customer_id": "3057627e-d6cf-4cc7-a5e0-d3b56919f721",
-  "name": "OpenClaw Demo",
+  "name": "Your City Events",
   "city": "Tampa",
   "state": "Florida",
-  "brand_name": "OpenClaw Demo",
+  "brand_name": "Your City Events",
   "primary_color": "#3B82F6",
   "logo_url": null,
   "allow_venue_creation": false
@@ -99,23 +89,23 @@ Returns the customer (city) this key belongs to.
 
 ## Sources
 
-A **source** is one site/feed to scrape. Creating or running a source kicks off a
+A **source** is one site/feed to scrape. Adding or running a source kicks off a
 background scrape; results land in your events as `status="new"`.
 
-> ⚠️ **`POST /sources` and `POST /sources/{id}/run` trigger real scraping**
-> (which may call paid third-party services). Don't create sources in a loop.
+> ⚠️ **`POST /sources` and `POST /sources/{id}/run` trigger real scraping.**
+> Don't create sources in a loop.
 
 ### `GET /sources`
 List your sources. Optional filters: `type`, `enabled` (bool).
 
 ### `POST /sources`
-Create a source **and immediately run it**.
+Add a source **and immediately run it**.
 
 | Field | Required | Notes |
 |-------|----------|-------|
 | `name` | ✅ | Display name |
 | `type` | ✅ | One of `website`, `instagram`, `facebook`, `ticketmaster` |
-| `config` | ✅* | Scraper config. For `website`: `{"url": "https://…"}` |
+| `config` | ✅ | Scraper config. For `website`: `{"url": "https://…"}` |
 | `venue_matching` | | `broad_source` (default) or `venue_specific` |
 | `venue_id` | | Only with `venue_specific` |
 | `enabled` | | Default `true` |
@@ -124,33 +114,31 @@ Create a source **and immediately run it**.
 curl -X POST "$BASE/sources" -H "X-API-Key: $KEY" -H "Content-Type: application/json" -d '{
   "name": "Downtown Arts Center",
   "type": "website",
-  "config": {"url": "https://example.com/calendar"},
-  "venue_matching": "broad_source"
+  "config": {"url": "https://example.com/calendar"}
 }'
 ```
 
-Response is the created source (status starts `queued`/`ready`, then updates as the
-run progresses):
+Response is the created source (`status` starts `queued`/`ready`, then updates as
+the run progresses):
 
 ```json
 {
-  "id": 123, "customer_id": "…", "name": "Downtown Arts Center",
-  "type": "website", "config": {"url": "https://example.com/calendar"},
+  "id": 123, "name": "Downtown Arts Center", "type": "website",
+  "config": {"url": "https://example.com/calendar"},
   "venue_matching": "broad_source", "enabled": true,
-  "status": "queued", "last_run": null, "last_run_records": null,
-  "last_error": null, "created_at": "…", "updated_at": "…"
+  "status": "queued", "last_run": null, "last_run_records": null, "last_error": null
 }
 ```
 
 ### `GET /sources/{id}`
-Fetch one source.
+Get one source.
 
 ### `PUT /sources/{id}`
 Update fields (`name`, `config`, `enabled`, `venue_matching`, …). Send only what
 you want to change.
 
 ### `DELETE /sources/{id}`
-Delete a source. By default its events are kept (their `source_id` is nulled).
+Delete a source. By default its events are kept (their `source_id` is cleared).
 Pass `?clear_events=true` to also delete the source's events.
 
 ### `POST /sources/{id}/run`
@@ -161,11 +149,11 @@ Re-run a source on demand. Query params: `enhance` (default `true`),
 { "task_id": "run_source_123", "status": "started", "message": "…", "log_id": 9001 }
 ```
 
-Poll the task with [`GET /tasks/{task_id}`](#tasks), or read the run log below.
+Poll it with [`GET /tasks/{task_id}`](#tasks), or read the run log below.
 
 ### `GET /sources/{id}/logs`
-Run history for a source. Params: `limit` (default 20, max 100), `offset`.
-Each log has scrape counts, status, errors, and enhancement metrics.
+Run history for a source. Params: `limit` (default 20, max 100), `offset`. Each
+log has scrape counts, status, errors, and enhancement metrics.
 
 ### `GET /sources/{id}/logs/{log_id}`
 A single run log.
@@ -175,7 +163,7 @@ A single run log.
 ## Events
 
 ### `GET /events`
-List your events (paginated, newest scheduled first). All filters are optional:
+List your events (paginated, soonest first). All filters are optional:
 
 | Param | Purpose |
 |-------|---------|
@@ -207,7 +195,7 @@ List your events (paginated, newest scheduled first). All filters are optional:
 ```
 
 ### `POST /events`
-Manually create a single event (enters as `status="new"`). Only `title` is required.
+Manually add a single event (enters as `status="new"`). Only `title` is required.
 
 | Field | Notes |
 |-------|-------|
@@ -250,7 +238,7 @@ curl -X PUT "$BASE/events/456" -H "X-API-Key: $KEY" -H "Content-Type: applicatio
 Permanently delete an event.
 
 ### `GET /events/stats`
-Counts for your tenant: totals, by status, by source, by category, upcoming,
+Counts for your account: totals, by status, by source, by category, upcoming,
 duplicates, pending enhancement.
 
 ```json
@@ -286,7 +274,7 @@ curl -X POST "$BASE/events/approve" -H "X-API-Key: $KEY" -H "Content-Type: appli
 { "approved": [456, 457], "not_found": [458] }
 ```
 
-`not_found` = ids that don't exist or aren't yours (silently skipped, never approved).
+`not_found` = ids that don't exist in your account (silently skipped).
 
 ### `POST /events/{id}/mark-duplicate`
 Mark an event as a duplicate of another of your events:
@@ -302,7 +290,7 @@ Reference lists for filtering/classifying.
 Categories present in your events: `[{"id": 1, "name": "Music & Concerts"}, …]`.
 
 ### `GET /audiences`
-Audience types: `[{"id": 1, "name": "Everyone"}, …]`.
+Audience types you can assign: `[{"id": 1, "name": "Everyone"}, …]`.
 
 ---
 
@@ -326,12 +314,4 @@ No auth. Returns `{"status": "healthy", "database": "connected"}`.
 
 ---
 
-## Out of scope
-
-A **customer key cannot** reach these (they require an admin key and return
-`401`/`403`): venues, AI chat, source discovery, scheduled jobs, social posts,
-tenant-config, the ops dashboard, and all `/admin/*` routes (customer & key
-management). Don't call them — your key isn't provisioned for them.
-
-You also cannot create your own customer or issue your own API keys — those are
-provisioned for you by a Whats Good admin.
+Need something that isn't covered here? Contact Whats Good.
